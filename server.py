@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# Request format:
+#   client ID (2B) | other ID (2B) | client IP (4B) | client port (2B)
+#
+# Response format:
+#   other IP (4B) | other port (2B)
 
 import socket
 import struct
