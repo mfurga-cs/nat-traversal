@@ -9,8 +9,8 @@ import random
 
 from utils import ByteWriter, ByteReader
 
-STUN_SERVER_HOST = "stun.l.google.com"
-STUN_SERVER_PORT = 19302
+STUN_SERVER_HOST = "stunserver.stunprotocol.org"
+STUN_SERVER_PORT = 3478
 STUN_MAGIC_COOKIE = 0x2112a442
 
 
@@ -18,6 +18,8 @@ class AttributeType(IntEnum):
   MAPPED_ADDRESS = 0x0001
   CHANGE_REQUEST = 0x0003
   XOR_MAPPED_ADDRESS = 0x0020
+  RESPONSE_ORIGIN = 0x802b
+  OTHER_ADDRESS = 0x802c
 
 
 class Attribute:
@@ -39,9 +41,9 @@ class Attribute:
     }
 
     if type not in attrs:
-      raise Exception("Nope")
-
-    value = attrs[type].from_bytes(value)
+      value = UnknownAttribute(value)
+    else:
+      value = attrs[type].from_bytes(value)
 
     return cls(type, value)
 
@@ -54,10 +56,10 @@ class Attribute:
 
   def __str__(self) -> str:
     s = []
-    s.append(f"Type: {self.type.name}")
-    s.append(f"Length: {self.length}")
+    s.append(f"Type: {self.type.name:<25}")
+    s.append(f"Length: {self.length:<8}")
     s.append(f"Value: {str(self.value)}")
-    return "\t".join(s)
+    return "".join(s)
 
   def to_bytes(self) -> bytes:
     writer = ByteWriter()
@@ -67,6 +69,24 @@ class Attribute:
     data = writer.write_bytes(self.value.to_bytes())
 
     return data
+
+
+class UnknownAttribute:
+  def __init__(self, data: bytes):
+    self.data = data
+
+  @classmethod
+  def from_bytes(cls, data: bytes):
+    return cls(data)
+
+  def to_bytes(self) -> bytes:
+    return self.data
+
+  def __len__(self) -> int:
+    return len(self.to_bytes())
+
+  def __str__(self) -> str:
+    return f"?? 0x{self.data.hex()}"
 
 
 class ChangeRequestAttribute:
@@ -187,12 +207,15 @@ class Message:
     s.append(f"  Attributes     :")
 
     for attr in self.attributes:
-      s.append(" " * 4 + str(attr) + "\n")
+      s.append(" " * 4 + str(attr))
 
     return "\n".join(s)
 
 
-def stun_client(source_ip: str, source_port: int) -> None:
+def stun_nat_type() -> None:
+  source_ip = "0.0.0.0"
+  source_port = 4000
+
   sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
   sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
@@ -212,12 +235,13 @@ def stun_client(source_ip: str, source_port: int) -> None:
   )
   sock.sendto(request.to_bytes(), (STUN_SERVER_HOST, STUN_SERVER_PORT))
 
-  response, _ = sock.recvfrom(1024)
+  response, addr = sock.recvfrom(1024)
   message = Message.from_bytes(response)
   assert transaction_id == message.transaction_id
+  print(f"Response from {addr[0]}:{addr[1]}")
   print(message)
 
 
 if __name__ == "__main__":
-  stun_client("0.0.0.0", 4000)
+  stun_nat_type()
 
