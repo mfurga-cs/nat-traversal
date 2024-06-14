@@ -212,7 +212,7 @@ class Message:
     return "\n".join(s)
 
 
-def stun_nat_type() -> None:
+def stun_nat_type() -> Message:
   source_ip = "0.0.0.0"
   source_port = 4000
 
@@ -238,10 +238,13 @@ def stun_nat_type() -> None:
   response, addr = sock.recvfrom(1024)
   message = Message.from_bytes(response)
   assert transaction_id == message.transaction_id
+
   print(f"Response from {addr[0]}:{addr[1]}")
   print(message)
 
+  return message
+
 
 if __name__ == "__main__":
-  stun_nat_type()
+  message = stun_nat_type()
 
