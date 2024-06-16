@@ -20,7 +20,15 @@ CONNECTIONS = {
 CONNECTIONS_CV = threading.Condition()
 
 def handle_connection(clientsock, addr) -> None:
-  data = clientsock.recv(1024)
+  data = ""
+
+  while len(data) == 0:
+    try:
+      data = clientsock.recv(1024)
+    except ConnectionResetError:
+      print("Connection reset by peer!")
+      return
+
   reader = ByteReader(data)
 
   client_id = reader.read_u16()
@@ -62,6 +70,9 @@ def main() -> None:
 
   while True:
     (clientsock, addr) = sock.accept()
+
+    print(f"Received new connection from {addr}")
+
     t = threading.Thread(target=handle_connection, args=(clientsock, addr))
     t.start()
 
