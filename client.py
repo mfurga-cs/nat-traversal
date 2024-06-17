@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
+from threading import Thread
 from requests import get
-from time import sleep
 import socket
 import struct
 
@@ -13,8 +13,23 @@ FRIEND_ID = 2
 
 HOST = "0.0.0.0"
 
-SERVER_IP = "1.2.3.4"
+SERVER_IP = "83.29.144.133"
 SERVER_PORT = 31337
+
+
+def listen_for_messages(sock):
+  while True:
+    msg = ""
+
+    while len(msg) == 0:
+      try:
+        msg = sock.recv(1024)
+
+        print(f"Received message: {msg.decode()}")
+      except ConnectionRefusedError:
+        return
+      except OSError:
+        return
 
 
 def main() -> None:
@@ -55,8 +70,8 @@ def main() -> None:
   # Close the connection to the server
   sock.close()
 
-  if MY_ID == 1:
-    # Create a UDP hole
+  # Create a UDP hole (from client with lower ID)
+  if MY_ID < FRIEND_ID:
     print("Creating a UDP hole...")
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -67,34 +82,29 @@ def main() -> None:
 
     sock.close()
 
-    # Wait for a message from the friend
-    print("Waiting for a message from the friend")
+  # Create a connection to the friend
+  sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+  sock.bind((HOST, port_addr))
+  sock.connect((friend_ip, friend_port))
 
-    sock.bind((HOST, port_addr))
+  listen_thread = Thread(target=listen_for_messages, args=(sock,))
+  listen_thread.start()
 
-    msg_data = ""
-    while len(msg_data) == 0:
-      msg_data = sock.recv(1024)
+  # Main loop for chat clients
+  print("Use /send to send a message:")
 
-    print(f"Received message from the friend: {msg_data}")
-  else:
-    # Wait a few seconds
-    sleep(5)
+  while True:
+    msg = input()
 
-    # Use the created UDP hole
-    print("Use the created UDP hole...")
-
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((HOST, port_addr))
-    sock.connect((friend_ip, friend_port))
-
-    sock.send("Hello my friend!".encode())
+    if msg.startswith("/send "):
+      sock.send(msg[6:].encode())
 
   # Close the connection to the friend
   sock.close()
+
+  # End the listening thread
+  listen_thread.join()  
 
 
 if __name__ == "__main__":
